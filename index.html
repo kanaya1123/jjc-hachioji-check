@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#111827">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="店舗チェック">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>店舗チェック｜JELLY JELLY CAFE 八王子店</title>
+<style>
+:root{--bg:#f3f4f6;--card:#fff;--text:#111827;--muted:#6b7280;--line:#e5e7eb;--ok:#16a34a;--warn:#b45309}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif}
+header{background:#111827;color:#fff;padding:20px 16px 16px;position:sticky;top:0;z-index:10}
+.top{display:flex;align-items:center;justify-content:space-between;gap:12px}.title{font-size:20px;font-weight:800}.date{font-size:14px;opacity:.75;margin-top:4px}
+button{font:inherit}.reset{border:1px solid #4b5563;background:#1f2937;color:#fff;border-radius:10px;padding:9px 11px;font-size:12px}
+main{max-width:720px;margin:0 auto;padding:15px 14px 45px}
+.notice{background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;padding:13px 14px;border-radius:14px;font-size:13px;line-height:1.55;margin-bottom:15px}
+.notice.ok{background:#f0fdf4;border-color:#bbf7d0;color:#166534}
+.carry{background:#fff7ed;border-color:#fed7aa}.carry h3{margin:0 0 6px;font-size:15px}.carry p{margin:0 0 9px;color:#9a3412;font-size:12px}
+.section-title{font-size:17px;font-weight:800;margin:18px 2px 8px}.hint{font-size:12px;color:var(--muted);font-weight:500}
+.card{background:#fff;border-radius:15px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+.item{display:flex;align-items:center;gap:12px;padding:15px 14px;min-height:62px;border-bottom:1px solid var(--line)}.item:last-child{border-bottom:0}
+.item input{width:26px;height:26px;accent-color:var(--ok);flex:none}.item label{flex:1;font-size:15px;line-height:1.45}.done label{text-decoration:line-through;color:var(--muted)}
+.badge{font-size:11px;border-radius:999px;padding:4px 7px;background:#f3f4f6;color:#4b5563;white-space:nowrap}.badge.warn{background:#fef3c7;color:#92400e}.badge.ok{background:#dcfce7;color:#166534}
+.beer-box{padding:16px}.beer-box strong{display:block;font-size:16px}.beer-box p{margin:5px 0 12px;color:var(--muted);font-size:13px}
+.beer-btn{width:100%;border:0;border-radius:12px;padding:14px;background:#111827;color:#fff;font-weight:800}.beer-btn.active{background:#166534}
+.progress{margin-top:10px;height:8px;background:#e5e7eb;border-radius:99px;overflow:hidden}.bar{height:100%;background:var(--ok);transition:.2s}
+.progress-text{font-size:12px;color:var(--muted);margin-top:6px}
+.carry-item{display:flex;align-items:center;gap:10px;padding:10px 0;border-top:1px solid #fed7aa}.carry-item input{width:23px;height:23px;accent-color:var(--ok)}
+footer{text-align:center;color:var(--muted);font-size:11px;line-height:1.6;padding-top:20px}
+@media(min-width:600px){.item{padding:17px 18px}.item input{width:28px;height:28px}}
+</style>
+</head>
+<body>
+<header>
+ <div class="top">
+  <div><div class="title">JELLY JELLY CAFE 八王子店</div><div class="date" id="date"></div></div>
+  <button class="reset" id="reset">今日をリセット</button>
+ </div>
+</header>
+<main>
+ <div id="carry"></div>
+
+ <div class="section-title">☀️ 朝 <span class="hint">優先度順</span></div>
+ <div class="card" id="morning"></div>
+
+ <div class="section-title">🌙 夜 <span class="hint">ゴミ出しは火曜・日曜</span></div>
+ <div class="card" id="night"></div>
+
+ <div class="section-title" id="beerTitle" style="display:none">🍺 ビールを使った日</div>
+ <div class="card" id="beer" style="display:none"></div>
+
+ <div class="card beer-box">
+  <strong>🍺 今日ビールを使用しましたか？</strong>
+  <p>「使用した」を押すと、ビールの締め作業が表示されます。</p>
+  <button class="beer-btn" id="beerBtn">🍺 ビールを使用した</button>
+ </div>
+
+ <div class="section-title">📋 時間がない時は翌朝へ <span class="hint">メモして回してOK</span></div>
+ <div class="card" id="tomorrow"></div>
+
+ <footer>基本的にゴミ出し以外は営業中に実施OK。<br>レジ締めは22:00以降。</footer>
+</main>
+
+<script>
+const KEY="jjc_hachioji_ipad_v1";
+const DOW=["日","月","火","水","木","金","土"];
+const base={
+ morning:[["pot","ポットに水を入れる","最優先"],["cash","レジ金確認",""],["sign","看板を外に出す",""],["clean","掃除",""],["sns_morning","インスタ・Xの投稿","開店後でもOK"]],
+ night:[["sns_night","インスタ・Xの投稿",""],["register_close","レジ締め","22:00以降"],["pot_off","ポットのコンセントを抜く",""],["towel","タオルの手洗い",""]],
+ beer:[["server","サーバーの口を洗う",""],["gas","ガス栓を閉じる",""],["tray","トレーを洗う",""]],
+ tomorrow:[["expiry","期限切れのものを廃棄",""],["order","飲み物の発注（封の空いているもの）",""],["hose","冷蔵庫下のホースの確認",""],["stock","備品の補充",""]]
+};
+function keyFor(d=new Date()){return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")}
+function readDay(k){try{return JSON.parse(localStorage.getItem(KEY+"_"+k))||{checked:{},beerUsed:false}}catch{return{checked:{},beerUsed:false}}}
+function writeDay(k,s){localStorage.setItem(KEY+"_"+k,JSON.stringify(s))}
+let todayKey=keyFor(), state=readDay(todayKey);
+const d=new Date();
+document.getElementById("date").textContent=`${d.getFullYear()}年${d.getMonth()+1}月${d.getDate()}日（${DOW[d.getDay()]}）`;
+
+function renderCarry(){
+ const root=document.getElementById("carry");root.innerHTML="";
+ const y=new Date(d);y.setDate(y.getDate()-1);const prev=readDay(keyFor(y));
+ const pending=base.tomorrow.filter(x=>!prev.checked[x[0]]);
+ // 「昨日そのものを使っていない」初回アクセス時にも4項目全部が出るのを避ける
+ const hasPrev=localStorage.getItem(KEY+"_"+keyFor(y));
+ if(!hasPrev || pending.length===0)return;
+ const box=document.createElement("div");box.className="notice carry";
+ box.innerHTML="<h3>⚠️ 昨日からの持ち越し</h3><p>昨日「時間がない時は翌朝へ」に残った項目です。今日の作業として確認してください。</p>";
+ pending.forEach(item=>{
+  const [id,text]=item;const row=document.createElement("div");row.className="carry-item";
+  const cb=document.createElement("input");cb.type="checkbox";cb.checked=!!state.checked["carry_"+id];
+  const lab=document.createElement("span");lab.textContent=text;row.append(cb,lab);box.append(row);
+  cb.onchange=()=>{state.checked["carry_"+id]=cb.checked;writeDay(todayKey,state);renderCarry()}
+ });
+ root.append(box);
+}
+function makeItem(item){
+ const [id,text,badge]=item,row=document.createElement("div");row.className="item";
+ const cb=document.createElement("input");cb.type="checkbox";cb.checked=!!state.checked[id];
+ const lab=document.createElement("label");lab.textContent=text;
+ if(cb.checked)row.classList.add("done");
+ if(id==="register_close" && d.getHours()<22){cb.disabled=true}
+ row.append(cb,lab);
+ if(badge){const b=document.createElement("span");b.className="badge"+(badge==="22:00以降"?" warn":badge==="最優先"?" ok":"");b.textContent=badge;row.append(b)}
+ cb.onchange=()=>{
+  if(id==="register_close" && new Date().getHours()<22){cb.checked=false;alert("レジ締めは22:00以降にチェックしてください。");return}
+  state.checked[id]=cb.checked;writeDay(todayKey,state);row.classList.toggle("done",cb.checked)
+ };
+ return row;
+}
+function render(){
+ for(const [id,items] of [["morning",base.morning],["night",base.night],["beer",base.beer],["tomorrow",base.tomorrow]]){
+  const root=document.getElementById(id);root.innerHTML="";
+  if(id==="beer"){root.style.display=state.beerUsed?"block":"none";document.getElementById("beerTitle").style.display=state.beerUsed?"block":"none";if(!state.beerUsed)continue}
+  items.forEach(x=>root.append(makeItem(x)));
+ }
+ if(d.getDay()===0||d.getDay()===2) document.getElementById("night").append(makeItem(["trash","ゴミ出し","今日"]));
+ const btn=document.getElementById("beerBtn");btn.classList.toggle("active",state.beerUsed);btn.textContent=state.beerUsed?"🍺 ビール使用あり（タップで解除）":"🍺 ビールを使用した";
+ renderCarry();
+}
+document.getElementById("beerBtn").onclick=()=>{state.beerUsed=!state.beerUsed;writeDay(todayKey,state);render()};
+document.getElementById("reset").onclick=()=>{if(confirm("今日のチェックをすべてリセットしますか？")){state={checked:{},beerUsed:false};writeDay(todayKey,state);render()}};
+render();
+
+// 日付をまたいで開きっぱなしにした場合も、新しい日付へ自動切替
+setInterval(()=>{
+ const k=keyFor();
+ if(k!==todayKey){location.reload()}
+},30000);
+</script>
+</body>
+</html>
